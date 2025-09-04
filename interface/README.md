@@ -10,3 +10,5 @@ A decidir. Opções consideradas:
 - C# (Avalonia)
 - C++ (Dear ImGUI)
 - Web (🤢)
+
+Utilizada atualmente: PySide
