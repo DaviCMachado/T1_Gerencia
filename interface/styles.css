@@ -1,0 +1,23 @@
+/* Estilo geral dos botões */
+QPushButton {
+background-color: #4CAF50;
+color: white;
+border-radius: 5px;
+padding: 10px;
+font-size: 16px;
+text-align: left;
+/}
+
+/* Efeito de hover (passar o mouse) nos botões */
+QPushButton:hover {
+background-color: #45a049;
+}
+
+/* Estilo para os rótulos de conteúdo do histórico */
+QLabel {
+background-color: #f033;
+color: #333333;
+border: 1px solid #c33c;
+padding: 10px;
+font-size: 14px;
+}
