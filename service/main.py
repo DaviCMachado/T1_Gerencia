@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from scan.scan_base import BaseScanner, ScanStatus, Network
 from scan.ping_scan import PingScanner
+from scan.arp_scan import ArpScanner
 
 app = FastAPI()
 
@@ -8,6 +9,7 @@ networks: list[Network] = Network.get_local_networks()
 available_scanners: list[BaseScanner] = []
 for net in networks:
     available_scanners.append(PingScanner(f"ping-scanner-{net.ip}", net))
+    available_scanners.append(ArpScanner(f"arp-scanner-{net.ip}", net))
     # adicionar aqui outros tipos de scanners mais avancados
 
 
