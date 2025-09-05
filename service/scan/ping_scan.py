@@ -1,4 +1,4 @@
-from scan_base import BaseScanner, ScanStatus, Network
+from scan.scan_base import BaseScanner, ScanStatus, Network
 
 class PingScanner(BaseScanner):
 
@@ -6,6 +6,7 @@ class PingScanner(BaseScanner):
         super().__init__(id, network)
 
     def start_scan(self) -> None:
+        print("started ping scanner id:", self.id, " network:", self.network.interface, f"{self.network.ip.network_address}/{self.network.ip.prefixlen}")
         pass
 
     def stop_scan(self) -> None:

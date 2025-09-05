@@ -1,4 +1,4 @@
-from service.mac_vendor import MacVendor
+from mac_vendor import MacVendor
 from enum import Enum
 from datetime import datetime
 

@@ -1,3 +1,5 @@
 python-nmap
 Pyside6
 psutil
+fastapi[standard]
+uvicorn

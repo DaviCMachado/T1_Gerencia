@@ -10,7 +10,7 @@ Foi utilizado Python junto com a biblioteca [FastAPI](https://fastapi.tiangolo.c
 
 ## Como executar
 
-Digite `fastapi dev main.py` no terminal na pasta `service/` para iniciar o servidor.
+Digite `uvicorn main:app` no terminal na pasta `service/` para iniciar o servidor.
 
 
 ## Sobre o DB

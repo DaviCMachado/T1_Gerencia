@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from ..device import Device
+from device import Device
 import psutil
 import ipaddress
 
@@ -12,13 +12,11 @@ class ScanStatus(Enum):
 
 class Network:
     interface: str
-    ip: str
-    prefix_size: int
+    ip: ipaddress.IPv4Network | ipaddress.IPv6Network
 
-    def __init__(self, interface: str, ip: str, prefix_size: int):
+    def __init__(self, interface: str, ip: ipaddress.IPv4Network | ipaddress.IPv6Network):
         self.interface = interface
         self.ip = ip
-        self.prefix_size = prefix_size
 
     @staticmethod
     def get_local_networks():
@@ -27,12 +25,10 @@ class Network:
 
         for iface, infos in addrs.items():
             for info in infos:
-                if info.family == psutil.AF_INET:
-                    ip = info.address
-                    netmask = info.netmask
-                    if ip and netmask:
-                        prefix = ipaddress.IPv4Network(f"0.0.0.0/{netmask}").prefixlen
-                        redes.append(Network(interface=iface, ip=ip, prefix_size=prefix))
+                if info.family == 2: # 2 eh ipv4, 23 eh ipv6, o resto ignora
+                    if info.address and info.netmask:
+                        network_ip = ipaddress.IPv4Network(f"{info.address}/{info.netmask}", strict=False)
+                        redes.append(Network(interface=iface, ip=network_ip))
         return redes
 
 class BaseScanner(ABC):
@@ -88,5 +84,3 @@ class BaseScanner(ABC):
         Limpa a lista de dispositivos conhecidos por este scan.
         '''
         self.known_devices = []
-
-

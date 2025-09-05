@@ -1,6 +1,6 @@
 from fastapi import FastAPI
-from scan.ping_scan import PingScanner
 from scan.scan_base import BaseScanner, ScanStatus, Network
+from scan.ping_scan import PingScanner
 
 app = FastAPI()
 
