@@ -57,9 +57,9 @@ class Device:
     Endereco IP do dispositivo na rede. Pode ser IPv4 ou IPv6.
     '''
 
-    mac: str
+    mac: str | None
     '''
-    Endereco MAC do dispositivo na rede.
+    Endereco MAC do dispositivo na rede ou None se o metodo de captura nao pegou o MAC.
     '''
 
     so: str | None
@@ -91,5 +91,8 @@ class Device:
     def is_same(self, other: object) -> bool:
         if not isinstance(other, Device):
             return False
-        return (self.ip == other.ip and
-                self.mac == other.mac)
+        if self.ip != other.ip:
+            return False
+        if self.mac is None or other.mac is None:
+            return True
+        return self.mac.lower() == other.mac.lower()

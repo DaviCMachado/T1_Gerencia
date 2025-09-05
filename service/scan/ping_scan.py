@@ -1,6 +1,10 @@
 from time import sleep
 from scan.scan_base import BaseScanner, ScanStatus, Network
 from threading import Thread, Event
+from scapy.all import sr1, IP, ICMP
+from ipaddress import IPv4Address
+from device import Device, DeviceStatus
+from datetime import datetime
 
 class PingScanner(BaseScanner):
 
@@ -15,15 +19,36 @@ class PingScanner(BaseScanner):
         self.thread.start()
 
     def __scan(self):
-        count = 0
-        while(not self.stop_event.is_set()):
-            sleep(1)
-            count += 1
-            print("Ping", count)
+        for host in self.network.ip.hosts():
+            if self.stop_event.is_set():
+                self.finished = False
+                return
+            print(f"Pinging {host.exploded}...")
+            if self.__ping(host):
+                device = Device()
+                device.ip = host.exploded
+                device.last_seen = datetime.now()
+                device.mac = None
+                device.so = None
+                device.status = DeviceStatus.ONLINE
+                device.services = []
+                self._add_device(host)
+                print(f"Host {host} is online")
+            else:
+                pass
+                
+        self.finished = True
+        
+    def __ping(self, host: IPv4Address) -> bool:
+        packet = IP(dst=host.exploded)/ICMP()
+        reply = sr1(packet, timeout=1, verbose=0)
+        return reply is not None
 
     def stop_scan(self) -> None:
+        print("stopping ping scanner id:", self.id)
         self.stop_event.set()
         self.thread.join()
+        print("stopped ping scanner id:", self.id)
 
     def get_status(self) -> ScanStatus:
         if hasattr(self, 'finished') and self.finished:
