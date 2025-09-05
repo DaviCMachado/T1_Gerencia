@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import sqlite3
 from datetime import datetime
+from mac_vendor import MacVendor
 
 class Scanner:
     def __init__(self, db_file=None, mac_vendors_file=None):
@@ -138,24 +139,7 @@ class Scanner:
         conn.close()
 
     # ------------------- MAC Vendors -------------------
-    def carregar_mac_vendors(self):
-        path = Path(self.MAC_VENDORS_FILE)
-        if not path.exists():
-            print("⚠️ Arquivo mac-vendors.json não encontrado. Fabricantes não serão identificados.")
-            return {}
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        vendors = {}
-        for item in data:
-            prefixo = item["macPrefix"].replace(":", "").upper()
-            vendors[prefixo] = item["vendorName"]
-        return vendors
-
-    def obter_fabricante_mac(self, mac_address):
-        if not mac_address or mac_address == "N/A":
-            return "N/A"
-        prefixo = mac_address.upper().replace(":", "")[:6]
-        return self.vendors.get(prefixo, "Fabricante não encontrado")
+    
 
     # ------------------- Rede -------------------
     def obter_faixa_ip_local(self):
@@ -203,7 +187,7 @@ class Scanner:
                 'ip': host,
                 'status': 'up',
                 'mac_address': mac,
-                'fabricante': self.obter_fabricante_mac(mac),
+                'fabricante': MacVendor.obter_fabricante_mac(mac),
                 'so': so,
                 'servicos': []
             }

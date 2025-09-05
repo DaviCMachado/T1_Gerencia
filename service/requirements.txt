@@ -1,0 +1,3 @@
+python-nmap
+Pyside6
+psutil
