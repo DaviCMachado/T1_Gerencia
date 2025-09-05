@@ -89,7 +89,7 @@ class BaseScanner(ABC):
     def register_discovery_callback(self, discovery_callback) -> None:
         '''
         Registra mais uma funcao de callback que sera chamada sempre que um novo dispositivo for descoberto.
-        A funcao deve receber um parametro do tipo Device.
+        A funcao deve receber um parametro do tipo Device. Usado para registrar um historico de dispositivos descobertos.
         '''
         if not hasattr(self, 'discovery_callbacks'):
             self.discovery_callbacks = []

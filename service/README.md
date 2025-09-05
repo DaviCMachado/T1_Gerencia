@@ -42,6 +42,32 @@ Digite `uvicorn main:app` no terminal na pasta `service/` para iniciar o servido
     }
     ```
 
+* **GET** `/known_devices/`: Retorna uma lista de todos os dispositivos que o scan já reconheceu. Retorno no formato:
+    ```json
+    [
+        {
+            "id": 13,
+            "ip": "192.168.0.10",
+            "mac": "00:1A:2B:3C:4D:5E",
+            "so": null,
+            "status": "online", // "offline" ou "unknown"
+            "last_seen": "2023-10-01T12:34:56",
+            "services":[
+                {
+                    "port": 80,
+                    "protocol": "tcp",
+                    "name": "http",
+                    "version": null,
+                    "start_date": "2023-10-01T12:34:56",
+                    "last_seen": "2023-10-01T12:34:56"
+                },
+                // ...
+            ]
+        },
+        // ...
+    ]
+    ```
+
 ### Redes
 
 * **GET** `/networks/`: Retorna quais sao as interfaces de rede que estão registradas no serviço remoto. Retorna uma lista no formato:

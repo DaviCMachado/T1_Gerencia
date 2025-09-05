@@ -63,3 +63,10 @@ def list_networks():
             "prefix": net.ip.prefixlen
         } for net in networks
     ]
+
+@app.get("/known_devices")
+def list_known_devices():
+    devices = []
+    for scanner in available_scanners:
+        devices.extend(scanner.get_devices())
+    return devices
