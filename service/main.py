@@ -12,7 +12,7 @@ for net in networks:
 
 
 @app.get("/scan/start")
-async def start_scan():
+def start_scan():
     for scanner in available_scanners:
         if(scanner.get_status() != ScanStatus.Scanning):
             scanner.start_scan()
@@ -23,7 +23,7 @@ async def start_scan():
     }
 
 @app.get("/scan/stop")
-async def stop_scan():
+def stop_scan():
 
     for scanner in available_scanners:
         if(scanner.get_status() == ScanStatus.Scanning):
@@ -35,7 +35,7 @@ async def stop_scan():
     }
 
 @app.get("/scan/status")
-async def scan_status():
+def scan_status():
     running = 0
     completed = 0
     stopped = 0
@@ -52,3 +52,14 @@ async def scan_status():
         "completed": completed,
         "stopped": stopped
     }
+
+@app.get("/networks")
+def list_networks():
+    return [
+        {
+            "interface": net.interface,
+            "ip": net.ip.network_address,
+            "netmask": net.ip.netmask,
+            "prefix": net.ip.prefixlen
+        } for net in networks
+    ]

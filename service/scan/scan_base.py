@@ -78,6 +78,23 @@ class BaseScanner(ABC):
         Retorna uma lista com os dispositivos descobertos por este scan.
         '''
         return self.known_devices
+
+    def _add_device(self, device: Device) -> None:
+        if device not in self.known_devices:
+            self.known_devices.append(device)
+            if hasattr(self, 'discovery_callbacks'):
+                for callback in self.discovery_callbacks:
+                    callback(device)
+    
+    def register_discovery_callback(self, discovery_callback) -> None:
+        '''
+        Registra mais uma funcao de callback que sera chamada sempre que um novo dispositivo for descoberto.
+        A funcao deve receber um parametro do tipo Device.
+        '''
+        if not hasattr(self, 'discovery_callbacks'):
+            self.discovery_callbacks = []
+        self.discovery_callbacks.append(discovery_callback)
+
     
     def clear_devices(self) -> None:
         '''
