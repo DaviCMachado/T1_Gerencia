@@ -3,3 +3,4 @@ Pyside6
 psutil
 fastapi[standard]
 uvicorn
+scapy

@@ -22,10 +22,17 @@ class Network:
     def get_local_networks():
         redes = []
         addrs = psutil.net_if_addrs()
+        stats = psutil.net_if_stats()
 
         for iface, infos in addrs.items():
+            if iface in stats and stats[iface].isup == False:
+                continue
             for info in infos:
                 if info.family == 2: # 2 eh ipv4, 23 eh ipv6, o resto ignora
+                    ip_obj = ipaddress.ip_address(info.address)
+                    if ip_obj.is_loopback or ip_obj.is_link_local or ip_obj.is_multicast or ip_obj.is_reserved or ip_obj.is_unspecified:
+                        break
+
                     if info.address and info.netmask:
                         network_ip = ipaddress.IPv4Network(f"{info.address}/{info.netmask}", strict=False)
                         redes.append(Network(interface=iface, ip=network_ip))
