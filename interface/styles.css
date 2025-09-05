@@ -15,8 +15,8 @@ background-color: #45a049;
 
 /* Estilo para os rótulos de conteúdo do histórico */
 QLabel {
-background-color: #f033;
-color: #333333;
+background-color: #ccc;
+color: #dfdfdf;
 border: 1px solid #c33c;
 padding: 10px;
 font-size: 14px;

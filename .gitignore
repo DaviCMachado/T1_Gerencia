@@ -1,0 +1,5 @@
+historico_redes.db
+*.sqlite
+*.db
+__pycache__/
+*pdf
