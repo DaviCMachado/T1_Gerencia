@@ -4,3 +4,5 @@ psutil
 fastapi[standard]
 uvicorn
 scapy
+pathlib
+requests

@@ -15,6 +15,9 @@ app = FastAPI()
 # --- Banco ---
 db = DB_Manager()
 
+# --- MAC Vendor warm-up ---
+mac_vendor = MacVendor()
+
 # --- Controle de scanners ---
 available_scanners: list[BaseScanner] = []
 merged_devices: list[Device] = []
@@ -33,7 +36,7 @@ def device_already_merged(dev: Device) -> bool:
 def on_device_discover(device: Device):
     dispositivo = {
         'ip': device.ip, 'mac': device.mac or None,
-        'fabricante': MacVendor().obter_fabricante_mac(device.mac),
+        'fabricante': mac_vendor.obter_fabricante_mac(device.mac),
         'so': device.so, 'servicos': device.services or []
     }
     with devices_lock:

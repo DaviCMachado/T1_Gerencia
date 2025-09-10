@@ -1,4 +1,3 @@
-from mac_vendor import MacVendor
 from enum import Enum
 from datetime import datetime
 
@@ -86,12 +85,6 @@ class Device:
     '''
     Data e hora em que o dispositivo foi mais recentemente detectado na rede.
     '''
-
-    def get_fabricante(self) -> str:
-        '''
-        Retorna o nome do fabricante do dispositivo com base no endereco MAC.
-        '''
-        return MacVendor().obter_fabricante_mac(self.mac)
         
     def is_same(self, other: object) -> bool:
         if not isinstance(other, Device):
@@ -110,6 +103,6 @@ class Device:
             "ip": self.ip,
             "mac": self.mac,
             "so": self.so,
-            "fabricante": self.get_fabricante(), 
+            "fabricante": self.vendor, 
             "servicos": [vars(s) for s in self.services] 
         }
