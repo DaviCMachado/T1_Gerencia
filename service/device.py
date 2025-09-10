@@ -67,6 +67,11 @@ class Device:
     Sistema operacional do dispositivo, se identificado.
     '''
 
+    vendor: str | None
+    '''
+    Fabricante do dispositivo, se identificado.
+    '''
+
     status: DeviceStatus
     '''
     Status atual do dispositivo na rede (online, offline, unknown).
@@ -96,3 +101,15 @@ class Device:
         if self.mac is None or other.mac is None:
             return True
         return self.mac.lower() == other.mac.lower()
+    
+    def to_dict(self):
+        """
+        Converte o objeto Device para um dicionário, ideal para respostas de API.
+        """
+        return {
+            "ip": self.ip,
+            "mac": self.mac,
+            "so": self.so,
+            "fabricante": self.get_fabricante(), 
+            "servicos": [vars(s) for s in self.services] 
+        }
