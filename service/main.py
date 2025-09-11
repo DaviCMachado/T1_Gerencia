@@ -9,8 +9,28 @@ from threading import Lock
 import signal
 import uvicorn
 from mac_vendor import MacVendor
+import asyncio
+from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # ----- STARTUP -----
+    task = asyncio.create_task(periodic_db_sync())  # sua tarefa de sincronização
+
+    # entrega o controle à aplicação
+    yield
+
+    # ----- SHUTDOWN -----
+    task.cancel()
+    # opcional: aguardar cancelamento
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
+
+
+app = FastAPI(lifespan=lifespan)
 
 # --- Banco ---
 db = DB_Manager()
@@ -21,6 +41,10 @@ mac_vendor = MacVendor()
 # --- Controle de scanners ---
 available_scanners: list[BaseScanner] = []
 merged_devices: list[Device] = []
+# merged_devices deve conter apenas os dispositivos encontrados nos ultimos 5 min
+# ou seja, apos 5 min sem ser visto, o dispositivo deve ser removido da lista merged_devices
+# da pra usar a funcao async periodic db sync que ja existe para isso
+
 devices_lock = Lock()
 scan_state_lock = Lock()
 scan_in_progress = False
@@ -34,9 +58,12 @@ def device_already_merged(dev: Device) -> bool:
     return False
 
 def on_device_discover(device: Device):
+
+    vendor = mac_vendor.obter_fabricante_mac(device.mac)
+    device.vendor = vendor
     dispositivo = {
         'ip': device.ip, 'mac': device.mac or None,
-        'fabricante': mac_vendor.obter_fabricante_mac(device.mac),
+        'fabricante': device.vendor,
         'so': device.so, 'servicos': device.services or []
     }
     with devices_lock:
@@ -46,17 +73,16 @@ def on_device_discover(device: Device):
         else:
             db.registrar_dispositivo(dispositivo, tipo='up')
 
-def add_offline_devices():
-    print("[SYSTEM] Finalizando scan e verificando dispositivos offline...")
-    all_db_devices = db.exibir_dispositivos() 
-    with devices_lock:
-        detected_ips = {d.ip for d in merged_devices}
-        for dev_tuple in all_db_devices:
-            ip, mac, _, _ = dev_tuple
-            if ip not in detected_ips:
-                print(f"[SYSTEM] Dispositivo {ip} ficou offline.")
-                db.registrar_dispositivo({'ip': ip, 'mac': mac}, tipo='down')
-    print("[SYSTEM] Verificação de offline concluída.")
+
+# adicionar rotina para a cada 5 min chamar db.apply_sync_operations()
+# em background
+
+async def periodic_db_sync():
+    while True:
+        # await asyncio.sleep(300)  # Espera 5 minutos
+        await asyncio.sleep(60)  # Espera 1 minuto
+        db.apply_sync_operations()
+
 
 # --- Detectar redes e Instanciar scanners (sem alterações) ---
 try:
@@ -93,7 +119,6 @@ def stop_scanners_in_background():
     with scan_state_lock:
         global scan_in_progress
         if scan_in_progress:
-            add_offline_devices()
             scan_in_progress = False
 
 
@@ -131,7 +156,6 @@ def scan_status():
     with scan_state_lock:
         global scan_in_progress
         if running == 0 and scan_in_progress:
-            add_offline_devices()
             scan_in_progress = False
     return {"scanning": running}
 
@@ -152,13 +176,46 @@ def device_history(ip: str):
             return device
     return {"error": "Device not found"}
 
+
 @app.get("/scan/discovered_devices")
 def list_discovered_devices():
-    """Retorna a lista de dispositivos encontrados APENAS na sessão de scan atual."""
+    """Retorna dispositivos vistos nos últimos 5 minutos."""
+    active_devices = []
     with devices_lock:
-        # Converte a lista de objetos Device em uma lista de dicionários para ser enviada como JSON
-        return [dev.to_dict() for dev in merged_devices]
+        all_devices = db.exibir_dispositivos_agregados()
+        cutoff = datetime.now() - timedelta(minutes=5)
+        for device in all_devices:
+            last_seen = device.get('last_seen')
+            if last_seen:
+                try:
+                    if datetime.fromisoformat(last_seen) > cutoff:
+                        active_devices.append(device)
+                except ValueError:
+                    # fallback para o formato "YYYY-MM-DD HH:MM:SS"
+                    if datetime.strptime(last_seen, "%Y-%m-%d %H:%M:%S") > cutoff:
+                        active_devices.append(device)
+    return active_devices
 
+
+@app.get("/operations")
+def list_operations():
+    """
+    Retorna TODAS as operações registradas no banco.
+    Cada item contém: ip, status e data/hora (ISO 8601).
+    """
+    ops = db.listar_operations() 
+    return [
+        {
+            "ip": op["ip"],
+            "status": op["status"],
+            "timestamp": (
+                op["timestamp"].isoformat()
+                if isinstance(op["timestamp"], datetime)
+                else str(op["timestamp"])
+            ),
+        }
+        for op in ops
+    ]
 
 
 def stop_all_scans(signum, frame):
@@ -168,12 +225,12 @@ def stop_all_scans(signum, frame):
             scanner.stop_scan()
         except Exception as e:
             print(f"[ERROR] Falha ao parar scanner {scanner.id}: {e}")
-    add_offline_devices()
     print("[SYSTEM] Todos os scanners foram parados. Saindo.")
     import sys
     sys.exit(0)
 
 signal.signal(signal.SIGINT, stop_all_scans)
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=80)
