@@ -96,13 +96,11 @@ class Device:
         return self.mac.lower() == other.mac.lower()
     
     def to_dict(self):
-        """
-        Converte o objeto Device para um dicionário, ideal para respostas de API.
-        """
         return {
-            "ip": self.ip,
-            "mac": self.mac,
-            "so": self.so,
-            "fabricante": self.vendor, 
-            "servicos": [vars(s) for s in self.services] 
+            'ip': self.ip,
+            'mac': self.mac,
+            'so': self.so,
+            'vendor': self.vendor,
+            'services': self.services,
+            'last_seen': self.last_seen.isoformat() if self.last_seen else None
         }
