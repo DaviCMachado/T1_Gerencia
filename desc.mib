@@ -1,0 +1,133 @@
+DISCOVERY-MIB DEFINITIONS ::= BEGIN
+
+IMPORTS
+    MODULE-IDENTITY, OBJECT-TYPE, enterprises, IpAddress
+        FROM SNMPv2-SMI
+    DisplayString
+        FROM SNMPv2-TC;
+
+discoveryMIB MODULE-IDENTITY
+    LAST-UPDATED "202509220000Z" -- site reclama de data em outro formato
+    ORGANIZATION "UFSM"
+    CONTACT-INFO "rappelt@inf.ufsm.br"
+    DESCRIPTION
+        "Mib para um agente SNMP interagir com este servico de gerencia de redes"
+    ::= { enterprises 42 }
+
+-- esse eh o unico filho por enquanto. outros servicos novos vem aqui
+autoDiscovery OBJECT IDENTIFIER ::= { discoveryMIB 1 }
+-- SCANNERS
+scanners OBJECT IDENTIFIER ::= { autoDiscovery 1 }
+-- SCANNER ACTIONS
+actions OBJECT IDENTIFIER ::= { scanners 1 }
+
+scannerStart OBJECT-TYPE
+    SYNTAX      INTEGER { trigger(1) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Comeca todos os scanners cadastrados quando eh escrito 1"
+    ::= { actions 1 }
+scannerStop OBJECT-TYPE
+    SYNTAX      INTEGER { trigger(1) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Para todos os scanners que estao rodando"
+    ::= { actions 2 }
+
+scannerRestart OBJECT-TYPE
+    SYNTAX      INTEGER { trigger(1) }
+    MAX-ACCESS  read-write
+    STATUS      current
+    DESCRIPTION
+        "Reinicia todos os scanners parados"
+    ::= { actions 3 }
+
+-- SCANNER STATUS
+status OBJECT IDENTIFIER ::= { scanners 2 }
+runningCount OBJECT-TYPE
+    SYNTAX      INTEGER (0..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Quantos scanners tao rodando"
+    ::= { status 1 }
+
+idleCount OBJECT-TYPE
+    SYNTAX      INTEGER (0..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Quantos scanners nao estao rodando"
+    ::= { status 2 }
+
+finishedCount OBJECT-TYPE
+    SYNTAX      INTEGER (0..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Quantos scanners ja terminaram sua varredura"
+    ::= { status 3 }
+
+
+-- DEVICES TABLE
+devices OBJECT IDENTIFIER ::= { autoDiscovery 2 }
+deviceTable OBJECT-TYPE
+    SYNTAX      SEQUENCE OF DeviceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Tabela dos dispositivos descobertos."
+    ::= { devices 1 }
+
+deviceEntry OBJECT-TYPE
+    SYNTAX      DeviceEntry
+    MAX-ACCESS  not-accessible
+    STATUS      current
+    DESCRIPTION
+        "Uma linha da tabela representando um dispositivo descoberto."
+    INDEX { deviceIndex }
+    ::= { deviceTable 1 }
+
+DeviceEntry ::= SEQUENCE {
+    deviceIndex  INTEGER,
+    deviceIP     IpAddress,
+    deviceStatus INTEGER
+}
+
+deviceIndex OBJECT-TYPE
+    SYNTAX      INTEGER (1..65535)
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "indice unico do dispositivo descoberto."
+    ::= { deviceEntry 1 }
+
+deviceIP OBJECT-TYPE
+    SYNTAX      IpAddress
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Endereco IP do dispositivo descoberto."
+    ::= { deviceEntry 2 }
+
+deviceStatus OBJECT-TYPE
+    SYNTAX      INTEGER {
+                    active(1),
+                    inactive(2),
+                    unknown(3)
+                }
+    MAX-ACCESS  read-only
+    STATUS      current
+    DESCRIPTION
+        "Status do dispositivo no momento do discovery."
+    ::= { deviceEntry 3 }
+
+
+
+
+
+
+
+END
