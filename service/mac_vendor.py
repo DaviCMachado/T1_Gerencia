@@ -27,4 +27,3 @@ class MacVendor:
             prefixo = mac_address.upper().replace(":", "")[:6]
             return MacVendor.vendors.get(prefixo, "Fabricante não encontrado")
     
-MacVendor()

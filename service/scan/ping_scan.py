@@ -32,7 +32,7 @@ class PingScanner(BaseScanner):
                 device.so = None
                 device.status = DeviceStatus.ONLINE
                 device.services = []
-                self._add_device(host)
+                self._add_device(device)
                 print(f"Host {host} is online")
             else:
                 pass

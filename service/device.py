@@ -1,4 +1,3 @@
-from mac_vendor import MacVendor
 from enum import Enum
 from datetime import datetime
 
@@ -67,6 +66,11 @@ class Device:
     Sistema operacional do dispositivo, se identificado.
     '''
 
+    vendor: str | None
+    '''
+    Fabricante do dispositivo, se identificado.
+    '''
+
     status: DeviceStatus
     '''
     Status atual do dispositivo na rede (online, offline, unknown).
@@ -81,12 +85,6 @@ class Device:
     '''
     Data e hora em que o dispositivo foi mais recentemente detectado na rede.
     '''
-
-    def get_fabricante(self) -> str:
-        '''
-        Retorna o nome do fabricante do dispositivo com base no endereco MAC.
-        '''
-        return MacVendor().obter_fabricante_mac(self.mac)
         
     def is_same(self, other: object) -> bool:
         if not isinstance(other, Device):
@@ -96,3 +94,13 @@ class Device:
         if self.mac is None or other.mac is None:
             return True
         return self.mac.lower() == other.mac.lower()
+    
+    def to_dict(self):
+        return {
+            'ip': self.ip,
+            'mac': self.mac,
+            'so': self.so,
+            'vendor': self.vendor,
+            'services': self.services,
+            'last_seen': self.last_seen.isoformat() if self.last_seen else None
+        }

@@ -3,3 +3,4 @@ historico_redes.db
 *.db
 __pycache__/
 *pdf
+*.pyc
