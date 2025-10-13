@@ -6,3 +6,4 @@ uvicorn
 scapy
 pathlib
 requests
+snmp-agent

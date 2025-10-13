@@ -1,4 +1,6 @@
 # MUDANÇA 1: Importar BackgroundTasks
+import asyncio
+import snmp_agent
 from fastapi import FastAPI, BackgroundTasks
 from scan.scan_base import BaseScanner, ScanStatus, Network
 from scan.ping_scan import PingScanner
@@ -9,25 +11,39 @@ from threading import Lock
 import signal
 import uvicorn
 from mac_vendor import MacVendor
-import asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
+import snmp # arquivo snmp.py
+
+async def run_snmp_server():
+    sv = snmp_agent.Server(handler=snmp.snmp_handler, host='0.0.0.0', port=161)
+    await sv.start()
+    try:
+        while True:
+            await asyncio.sleep(3600)
+    except asyncio.CancelledError:
+        await sv.stop()
+        print("[SNMP] Servidor encerrado.")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ----- STARTUP -----
-    task = asyncio.create_task(periodic_db_sync())  # sua tarefa de sincronização
+    db_task = asyncio.create_task(periodic_db_sync())  # sua tarefa de sincronização
+    snmp_task = asyncio.create_task(run_snmp_server())
 
     # entrega o controle à aplicação
     yield
 
     # ----- SHUTDOWN -----
-    task.cancel()
-    # opcional: aguardar cancelamento
-    try:
-        await task
-    except asyncio.CancelledError:
-        pass
+    db_task.cancel()
+    snmp_task.cancel()
+    for t in (db_task, snmp_task):
+        try:
+            await t
+        except asyncio.CancelledError:
+            pass
+    print("[SYSTEM] Tasks de background finalizadas.")
 
 
 app = FastAPI(lifespan=lifespan)
