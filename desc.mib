@@ -1,17 +1,24 @@
 DISCOVERY-MIB DEFINITIONS ::= BEGIN
 
 IMPORTS
-    MODULE-IDENTITY, OBJECT-TYPE, enterprises, IpAddress
+    MODULE-IDENTITY, OBJECT-TYPE, 
+    enterprises, IpAddress, Integer32
         FROM SNMPv2-SMI
-    DisplayString
-        FROM SNMPv2-TC;
+    OBJECT-GROUP, MODULE-COMPLIANCE
+        FROM SNMPv2-CONF;
 
 discoveryMIB MODULE-IDENTITY
-    LAST-UPDATED "202509220000Z" -- site reclama de data em outro formato
+    LAST-UPDATED "202509240001Z" -- site reclama de data em outro formato
     ORGANIZATION "UFSM"
     CONTACT-INFO "rappelt@inf.ufsm.br"
     DESCRIPTION
         "Mib para um agente SNMP interagir com este servico de gerencia de redes"
+    REVISION "202509240001Z"
+        DESCRIPTION
+            "Compliance adicionado"
+    REVISION "202509240000Z"
+        DESCRIPTION
+            "Revision adicionada; Grupos adicionados"
     ::= { enterprises 42 }
 
 -- esse eh o unico filho por enquanto. outros servicos novos vem aqui
@@ -20,6 +27,10 @@ autoDiscovery OBJECT IDENTIFIER ::= { discoveryMIB 1 }
 scanners OBJECT IDENTIFIER ::= { autoDiscovery 1 }
 -- SCANNER ACTIONS
 actions OBJECT IDENTIFIER ::= { scanners 1 }
+-- GRUPOS
+discoveryGroups OBJECT IDENTIFIER ::= { discoveryMIB 2 }
+-- COMPLIANCE
+compliances OBJECT IDENTIFIER ::= { discoveryMIB 3 }
 
 scannerStart OBJECT-TYPE
     SYNTAX      INTEGER { trigger(1) }
@@ -47,7 +58,7 @@ scannerRestart OBJECT-TYPE
 -- SCANNER STATUS
 status OBJECT IDENTIFIER ::= { scanners 2 }
 runningCount OBJECT-TYPE
-    SYNTAX      INTEGER (0..65535)
+    SYNTAX      Integer32 (0..65535)
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -55,7 +66,7 @@ runningCount OBJECT-TYPE
     ::= { status 1 }
 
 idleCount OBJECT-TYPE
-    SYNTAX      INTEGER (0..65535)
+    SYNTAX      Integer32 (0..65535)
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -63,7 +74,7 @@ idleCount OBJECT-TYPE
     ::= { status 2 }
 
 finishedCount OBJECT-TYPE
-    SYNTAX      INTEGER (0..65535)
+    SYNTAX      Integer32 (0..65535)
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -97,7 +108,7 @@ DeviceEntry ::= SEQUENCE {
 }
 
 deviceIndex OBJECT-TYPE
-    SYNTAX      INTEGER (1..65535)
+    SYNTAX      Integer32 (1..65535)
     MAX-ACCESS  read-only
     STATUS      current
     DESCRIPTION
@@ -125,9 +136,51 @@ deviceStatus OBJECT-TYPE
     ::= { deviceEntry 3 }
 
 
+-- grupos
+
+scannerGroup OBJECT-GROUP
+    OBJECTS {
+        scannerStart,
+        scannerStop,
+	scannerRestart
+    }
+    STATUS      current
+    DESCRIPTION "Grupo de scanners"
+    ::= { discoveryGroups 1 }
+
+countGroup OBJECT-GROUP
+    OBJECTS {
+        runningCount,
+        idleCount,
+	finishedCount
+    }
+    STATUS      current
+    DESCRIPTION "Grupo de contadores"
+    ::= { discoveryGroups 2 }
 
 
+deviceGroup OBJECT-GROUP
+    OBJECTS {
+        deviceIndex,
+        deviceIP,
+	deviceStatus
+    }
+    STATUS      current
+    DESCRIPTION "Grupo de estado do dispositivo"
+    ::= { discoveryGroups 3 }
 
 
+-- compliance
 
+moduleCompliance MODULE-COMPLIANCE
+    STATUS current
+    DESCRIPTION
+        "Compliance"
+    MODULE
+        MANDATORY-GROUPS {
+            scannerGroup,
+            countGroup,
+            deviceGroup
+        }
+    ::= { compliances 1}
 END
