@@ -1,0 +1,33 @@
+=== TESTE SNMP MIB DISCOVERY ===
+
+# --- INICIAR SCANNERS ---
+# SETREQUEST: inicia todos os scanners cadastrados
+snmpset -v2c -c public localhost 1.3.6.1.4.1.42.1.1.1 i 1
+
+# --- PARAR SCANNERS ---
+# SETREQUEST: para todos os scanners que estão rodando
+snmpset -v2c -c public localhost 1.3.6.1.4.1.42.1.1.2 i 1
+
+# --- CONSULTA CONTADORES ---
+# GETREQUEST: quantidade de scanners rodando atualmente
+snmpget -v2c -c public localhost 1.3.6.1.4.1.42.1.2.1
+
+# GETREQUEST: quantidade de scanners ociosos (idle)
+snmpget -v2c -c public localhost 1.3.6.1.4.1.42.1.2.2
+
+# GETREQUEST: quantidade de scanners que já finalizaram
+snmpget -v2c -c public localhost 1.3.6.1.4.1.42.1.2.3
+
+# --- TABELA DE DISPOSITIVOS ---
+# GETNEXT/GETBULK: exibe a tabela de dispositivos descobertos pelo agente
+snmpwalk -v2c -c public localhost 1.3.6.1.4.1.42.1.2.4.1
+
+# Cada entrada da tabela retorna:
+#   Coluna 1: deviceIndex (INTEGER)
+#   Coluna 2: deviceIP (STRING)
+#   Coluna 3: deviceStatus (INTEGER)
+# Valores possíveis do status:
+#   1 = active / ONLINE
+#   2 = inactive / OFFLINE
+#   3 = unknown / UNKNOWN
+
