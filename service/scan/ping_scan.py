@@ -52,7 +52,7 @@ class PingScanner(BaseScanner):
 
     def get_status(self) -> ScanStatus:
         if hasattr(self, 'finished') and self.finished:
-            return ScanStatus.Completed
+            return ScanStatus.Finished
         if (hasattr(self, 'stop_event') and self.stop_event.is_set()) or (not hasattr(self, 'thread') or not self.thread.is_alive()) or not hasattr(self, 'stop_event'):
-            return ScanStatus.Stopped
+            return ScanStatus.Idle
         return ScanStatus.Scanning

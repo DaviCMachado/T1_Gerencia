@@ -62,5 +62,5 @@ class ArpScanner(BaseScanner):
 
     def get_status(self) -> ScanStatus:
         if (hasattr(self, 'stop_event') and self.stop_event.is_set()) or (not hasattr(self, 'thread') or not self.thread.is_alive()) or not hasattr(self, 'stop_event'):
-            return ScanStatus.Stopped
+            return ScanStatus.Idle
         return ScanStatus.Scanning

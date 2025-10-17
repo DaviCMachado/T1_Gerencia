@@ -6,9 +6,9 @@ import ipaddress
 
 
 class ScanStatus(Enum):
-    Stopped = "stopped"
+    Idle = "idle"
     Scanning = "scanning"
-    Completed = "completed"
+    Finished = "finished"
 
 class Network:
     interface: str

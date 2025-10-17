@@ -1,4 +1,4 @@
-# MUDANÇA 1: Importar BackgroundTasks
+# main.py
 import asyncio
 import snmp_agent
 from fastapi import FastAPI, BackgroundTasks
@@ -13,8 +13,9 @@ import uvicorn
 from mac_vendor import MacVendor
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
-import snmp # arquivo snmp.py
+import snmp  # arquivo snmp.py
 
+# ---------------- SNMP SERVER ----------------
 async def run_snmp_server():
     sv = snmp_agent.Server(handler=snmp.snmp_handler, host='0.0.0.0', port=161)
     await sv.start()
@@ -25,17 +26,15 @@ async def run_snmp_server():
         await sv.stop()
         print("[SNMP] Servidor encerrado.")
 
-
+# ---------------- LIFESPAN ----------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ----- STARTUP -----
-    db_task = asyncio.create_task(periodic_db_sync())  # sua tarefa de sincronização
+    db_task = asyncio.create_task(periodic_db_sync())
     snmp_task = asyncio.create_task(run_snmp_server())
 
-    # entrega o controle à aplicação
-    yield
+    yield  # entrega o controle à aplicação
 
-    # ----- SHUTDOWN -----
+    # shutdown
     db_task.cancel()
     snmp_task.cancel()
     for t in (db_task, snmp_task):
@@ -45,24 +44,21 @@ async def lifespan(app: FastAPI):
             pass
     print("[SYSTEM] Tasks de background finalizadas.")
 
-
+# ---------------- APP ----------------
 app = FastAPI(lifespan=lifespan)
 
-# --- Banco ---
+# ---------------- DATABASE ----------------
 db = DB_Manager()
 
-# --- MAC Vendor warm-up ---
+# ---------------- MAC VENDOR ----------------
 mac_vendor = MacVendor()
 
-# --- Controle de scanners ---
+# ---------------- SCANNERS ----------------
 available_scanners: list[BaseScanner] = []
 merged_devices: list[Device] = []
-# merged_devices deve conter apenas os dispositivos encontrados nos ultimos 5 min
-# ou seja, apos 5 min sem ser visto, o dispositivo deve ser removido da lista merged_devices
-# da pra usar a funcao async periodic db sync que ja existe para isso
 
 devices_lock = Lock()
-scan_state_lock = Lock()
+scan_state_lock = asyncio.Lock()
 scan_in_progress = False
 
 def device_already_merged(dev: Device) -> bool:
@@ -74,33 +70,27 @@ def device_already_merged(dev: Device) -> bool:
     return False
 
 def on_device_discover(device: Device):
-
     vendor = mac_vendor.obter_fabricante_mac(device.mac)
     device.vendor = vendor
     dispositivo = {
-        'ip': device.ip, 'mac': device.mac or None,
+        'ip': device.ip,
+        'mac': device.mac or None,
         'fabricante': device.vendor,
-        'so': device.so, 'servicos': device.services or []
+        'so': device.so,
+        'servicos': device.services or []
     }
     with devices_lock:
         if not device_already_merged(device):
             merged_devices.append(device)
-            db.registrar_dispositivo(dispositivo, tipo='up')
-        else:
-            db.registrar_dispositivo(dispositivo, tipo='up')
+        db.registrar_dispositivo(dispositivo, tipo='up')
 
-
-# adicionar rotina para a cada 5 min chamar db.apply_sync_operations()
-# em background
-
+# ---------------- PERIODIC DB SYNC ----------------
 async def periodic_db_sync():
     while True:
-        # await asyncio.sleep(300)  # Espera 5 minutos
-        await asyncio.sleep(60)  # Espera 1 minuto
+        await asyncio.sleep(60)  # espera 1 minuto
         db.apply_sync_operations()
 
-
-# --- Detectar redes e Instanciar scanners (sem alterações) ---
+# ---------------- DETECT NETWORKS & INIT SCANNERS ----------------
 try:
     networks: list[Network] = Network.get_local_networks()
     print(f"Detected {len(networks)} networks:")
@@ -115,61 +105,57 @@ try:
 except Exception as e:
     print(f"ERRO CRÍTICO ao iniciar scanners: {e}")
 
-# --- Funções auxiliares para as tarefas de longa duração ---
-def run_scanners_in_background():
-    """Esta função contém a lógica que bloqueava o servidor."""
-    print("[BACKGROUND] Iniciando scanners em segundo plano...")
-    for scanner in available_scanners:
-        if scanner.get_status() != ScanStatus.Scanning:
-            scanner.start_scan() # Esta é a chamada demorada
+# ---------------- RUN/STOP SCANNERS ----------------
+async def run_scanners_in_background():
+    print("[BACKGROUND] Iniciando scanners em executor...")
+    loop = asyncio.get_running_loop()
+    tasks = [
+        loop.run_in_executor(None, scanner.start_scan)
+        for scanner in available_scanners
+        if scanner.get_status() != ScanStatus.Scanning
+    ]
+    if tasks:
+        await asyncio.gather(*tasks)
     print("[BACKGROUND] Todos os scanners foram iniciados.")
 
-def stop_scanners_in_background():
-    """Função para parar os scanners em segundo plano, se necessário."""
-    print("[BACKGROUND] Parando scanners em segundo plano...")
-    for scanner in available_scanners:
-        if scanner.get_status() == ScanStatus.Scanning:
-            scanner.stop_scan()
-    print("[BACKGROUND] Comando de parada enviado a todos os scanners.")
-    # Força a finalização e marcação de offline
-    with scan_state_lock:
-        global scan_in_progress
-        if scan_in_progress:
-            scan_in_progress = False
+async def stop_scanners_in_background():
+    print("[BACKGROUND] Parando scanners em executor...")
+    loop = asyncio.get_running_loop()
+    tasks = [
+        loop.run_in_executor(None, scanner.stop_scan)
+        for scanner in available_scanners
+        if scanner.get_status() == ScanStatus.Scanning
+    ]
+    if tasks:
+        await asyncio.gather(*tasks)
+    print("[BACKGROUND] Todos os scanners foram parados.")
 
+    # Atualiza estado
+    global scan_in_progress
+    async with scan_state_lock:
+        scan_in_progress = False
 
-# ------------------- FastAPI endpoints -------------------
-
-# Modifiquei os endpoints para usar BackgroundTasks
+# ---------------- FASTAPI ENDPOINTS ----------------
 @app.get("/scan/start")
 async def start_scan(background_tasks: BackgroundTasks):
     with devices_lock:
         merged_devices.clear()
-    
-    print("[API] Recebida requisição para iniciar o scan. Agendando tarefa em segundo plano.")
-    
-    with scan_state_lock:
+    async with scan_state_lock:
         global scan_in_progress
         scan_in_progress = True
-    
-    # Adiciona a função demorada para ser executada em segundo plano
-    background_tasks.add_task(run_scanners_in_background)
-    
-    # Retorna imediatamente para a GUI
-    return {"message": "Scan task scheduled", "status": "ok"}
 
+    background_tasks.add_task(lambda: asyncio.create_task(run_scanners_in_background()))
+    return {"message": "Scan task scheduled", "status": "ok"}
 
 @app.get("/scan/stop")
 async def stop_scan(background_tasks: BackgroundTasks):
-    print("[API] Recebida requisição para parar o scan. Agendando tarefa em segundo plano.")
-    background_tasks.add_task(stop_scanners_in_background)
+    background_tasks.add_task(lambda: asyncio.create_task(stop_scanners_in_background()))
     return {"message": "Stop task scheduled", "status": "ok"}
 
-
 @app.get("/scan/status")
-def scan_status():
-    running = sum(1 for scanner in available_scanners if scanner.get_status() == ScanStatus.Scanning)
-    with scan_state_lock:
+async def scan_status():
+    running = sum(1 for s in available_scanners if s.get_status() == ScanStatus.Scanning)
+    async with scan_state_lock:
         global scan_in_progress
         if running == 0 and scan_in_progress:
             scan_in_progress = False
@@ -181,21 +167,17 @@ def list_networks():
 
 @app.get("/devices")
 def list_devices():
-    print("[API] Servindo dados de dispositivos agregados.")
     return db.exibir_dispositivos_agregados()
 
 @app.get("/devices/{ip}/history")
 def device_history(ip: str):
-    all_devices = db.exibir_dispositivos_agregados()
-    for device in all_devices:
+    for device in db.exibir_dispositivos_agregados():
         if device['ip'] == ip:
             return device
     return {"error": "Device not found"}
 
-
 @app.get("/scan/discovered_devices")
 def list_discovered_devices():
-    """Retorna dispositivos vistos nos últimos 5 minutos."""
     active_devices = []
     with devices_lock:
         all_devices = db.exibir_dispositivos_agregados()
@@ -207,33 +189,19 @@ def list_discovered_devices():
                     if datetime.fromisoformat(last_seen) > cutoff:
                         active_devices.append(device)
                 except ValueError:
-                    # fallback para o formato "YYYY-MM-DD HH:MM:SS"
                     if datetime.strptime(last_seen, "%Y-%m-%d %H:%M:%S") > cutoff:
                         active_devices.append(device)
     return active_devices
 
-
 @app.get("/operations")
 def list_operations():
-    """
-    Retorna TODAS as operações registradas no banco.
-    Cada item contém: ip, status e data/hora (ISO 8601).
-    """
-    ops = db.listar_operations() 
+    ops = db.listar_operations()
     return [
-        {
-            "ip": op["ip"],
-            "status": op["status"],
-            "timestamp": (
-                op["timestamp"].isoformat()
-                if isinstance(op["timestamp"], datetime)
-                else str(op["timestamp"])
-            ),
-        }
+        {"ip": op["ip"], "status": op["status"], "timestamp": op["timestamp"].isoformat() if isinstance(op["timestamp"], datetime) else str(op["timestamp"])}
         for op in ops
     ]
 
-
+# ---------------- SIGNAL HANDLER ----------------
 def stop_all_scans(signum, frame):
     print("\n[SYSTEM] Ctrl+C detectado. Parando todos os scans ativos...")
     for scanner in available_scanners:
@@ -247,6 +215,6 @@ def stop_all_scans(signum, frame):
 
 signal.signal(signal.SIGINT, stop_all_scans)
 
-
+# ---------------- MAIN ----------------
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=80)
