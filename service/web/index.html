@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>SNMP Bridge UI</title>
+  <style>
+    body{font-family: Arial,Helvetica,sans-serif;padding:20px}
+    button{padding:10px 16px;margin:6px}
+    pre{background:#f4f4f4;padding:10px;border-radius:4px}
+  </style>
+</head>
+<body>
+  <h2>Controlador SNMP (Bridge)</h2>
+  <div>
+    <button id="btn-start">Start Scanners</button>
+    <button id="btn-stop">Stop Scanners</button>
+    <button id="btn-restart">Restart Scanners</button>
+    <button id="btn-metrics">Get Metrics</button>
+  </div>
+
+  <h3>Resultado</h3>
+  <pre id="out">Aguardando ação...</pre>
+
+  <script>
+    async function post(path) {
+      const resp = await fetch(path, {method:'POST'});
+      return resp.json();
+    }
+    async function get(path) {
+      const resp = await fetch(path);
+      return resp.json();
+    }
+
+    document.getElementById('btn-start').addEventListener('click', async () => {
+      document.getElementById('out').textContent = 'Enviando start...';
+      const r = await post('/api/scan/start');
+      document.getElementById('out').textContent = JSON.stringify(r, null, 2);
+    });
+
+    document.getElementById('btn-stop').addEventListener('click', async () => {
+      document.getElementById('out').textContent = 'Enviando stop...';
+      const r = await post('/api/scan/stop');
+      document.getElementById('out').textContent = JSON.stringify(r, null, 2);
+    });
+
+    document.getElementById('btn-restart').addEventListener('click', async () => {
+      document.getElementById('out').textContent = 'Enviando restart...';
+      const r = await post('/api/scan/restart');
+      document.getElementById('out').textContent = JSON.stringify(r, null, 2);
+    });
+
+    document.getElementById('btn-metrics').addEventListener('click', async () => {
+      document.getElementById('out').textContent = 'Consultando métricas...';
+      const r = await get('/api/metrics');
+      document.getElementById('out').textContent = JSON.stringify(r, null, 2);
+    });
+  </script>
+</body>
+</html>

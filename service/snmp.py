@@ -153,9 +153,12 @@ async def snmp_handler(req: SNMPRequest):
                 finished = sum(1 for s in available_scanners if s.get_status() == ScanStatus.Finished)
                 vbs.append(VariableBinding(oid, Integer(finished)))
 
-            elif oid.startswith("1.3.6.1.4.1.42.1.2.4"):  # tabela de dispositivos
-                table_oid_base = "1.3.6.1.4.1.42.1.2.4.1"
+            elif oid.startswith("1.3.6.1.4.1.42.1.2.1.1"):  # tabela de dispositivos
+                table_oid_base = "1.3.6.1.4.1.42.1.2.1.1"
                 all_devices = db.exibir_dispositivos_agregados()
+
+                if not all_devices:
+                    print("[SNMP] Nenhum dispositivo encontrado na base de dados.")
 
                 # monta todas as entradas da tabela
                 table_entries = []
@@ -208,7 +211,9 @@ async def snmp_handler(req: SNMPRequest):
                                 # tabela vazia: devolve endOfMibView usando req OID com sufixo incremental
                                 next_oid = '.'.join(map(str, req_oid_parsed + (next_oid_counter,)))
                                 next_oid_counter += 1
-                            vbs.append(VariableBinding(next_oid, Null(Null.END_OF_MIB_VIEW)))
+
+                            # vbs.append(VariableBinding(next_oid, Null(Null.END_OF_MIB_VIEW)))
+                            vbs.append(VariableBinding(next_oid, OctetString("End of Mib View")))
 
             else:
                 vbs.append(VariableBinding(oid, OctetString("noSuchName")))
@@ -217,5 +222,8 @@ async def snmp_handler(req: SNMPRequest):
 
     # --- Cria resposta SNMP sempre válida ---
     response = req.create_response(vbs)
+
+    if not response:
+        response = "DB VAZIO"
 
     return response

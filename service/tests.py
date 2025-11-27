@@ -23,7 +23,7 @@ COUNTERS_OIDS = {
     "idleCount": "1.3.6.1.4.1.42.1.2.2",
     "finishedCount": "1.3.6.1.4.1.42.1.2.3"
 }
-DEVICES_OID = "1.3.6.1.4.1.42.1.2.4.1"  # device table base
+DEVICES_OID = "1.3.6.1.4.1.42.1.2.1.1"  # device table base
 
 # --- Funções utilitárias ---
 def run_snmp_command(cmd):

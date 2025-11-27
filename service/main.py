@@ -69,6 +69,13 @@ def device_already_merged(dev: Device) -> bool:
             return True
     return False
 
+
+# # TODO
+# : ATUALIZAR ESTADO DO DISPOSITIVO
+# def devices_update_state():
+#     pass
+
+
 def on_device_discover(device: Device):
     vendor = mac_vendor.obter_fabricante_mac(device.mac)
     device.vendor = vendor
