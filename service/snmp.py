@@ -98,7 +98,7 @@ def decode_request_patch(data: bytes) -> SNMPRequest:
 snmp_agent.snmp.decode_request = decode_request_patch
 
 # --- 4. Handler SNMP para SET ---
-ACTIONS_OID = "1.3.6.1.4.1.42.1.1"
+ACTIONS_OID = "1.3.6.1.4.1.42.1.1.1"
 
 
 # --- garante que OIDs estejam ordenados ---
@@ -119,6 +119,7 @@ async def snmp_handler(req: SNMPRequest):
         print(f"[SNMP HANDLER] pdu_type: {getattr(req.context, 'pdu_type', None)}")  # seu print de pdu
 
         if is_set:
+            print("[SNMP HANDLER] Processando SetRequest...")
             # --- TRATAMENTO SETREQUEST ---
             if oid == f"{ACTIONS_OID}.1" and isinstance(value, Integer) and value.value == 1:
                 print("[SNMP] SetRequest: scannerStart")
@@ -140,16 +141,18 @@ async def snmp_handler(req: SNMPRequest):
 
             else:
                 # Read-only ou OID desconhecido -> erro
+                print(f"[SNMP] SetRequest: OID não gravável ou inválido. OID: {oid}")
                 vbs.append(VariableBinding(oid, OctetString("notWritable")))
 
         else:
-            if oid == "1.3.6.1.4.1.42.1.2.1":  # runningCount
+            print("[SNMP HANDLER] Processando GetRequest...")
+            if oid == "1.3.6.1.4.1.42.1.1.2.1":  # runningCount
                 running = sum(1 for s in available_scanners if s.get_status() == ScanStatus.Scanning)
                 vbs.append(VariableBinding(oid, Integer(running)))
-            elif oid == "1.3.6.1.4.1.42.1.2.2":  # idleCount
+            elif oid == "1.3.6.1.4.1.42.1.1.2.2":  # idleCount
                 idle = sum(1 for s in available_scanners if s.get_status() == ScanStatus.Idle)
                 vbs.append(VariableBinding(oid, Integer(idle)))
-            elif oid == "1.3.6.1.4.1.42.1.2.3":  # finishedCount
+            elif oid == "1.3.6.1.4.1.42.1.1.2.3":  # finishedCount
                 finished = sum(1 for s in available_scanners if s.get_status() == ScanStatus.Finished)
                 vbs.append(VariableBinding(oid, Integer(finished)))
 

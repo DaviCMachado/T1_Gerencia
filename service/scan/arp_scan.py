@@ -21,11 +21,14 @@ class ArpScanner(BaseScanner):
         pass
 
     def __scan(self):
-        sniff(filter="arp",
-              prn=self.__handle_packet,
-              store=0,
-              stop_filter=lambda x: self.stop_event.is_set(),
-              iface=self.network.interface)
+        try:
+            sniff(filter="arp",
+                prn=self.__handle_packet,
+                store=0,
+                stop_filter=lambda x: self.stop_event.is_set(),
+                iface=self.network.interface)
+        except Exception as e:
+            print("[ARP SCANNER] Error in sniff start. O WINPCAP esta instalado?? Msg:", e)
 
     def __handle_packet(self, pkt):
         print(f"ArpScanner({self.id}) Captured ARP packet:", pkt.summary())

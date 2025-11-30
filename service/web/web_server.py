@@ -139,9 +139,9 @@ SCANNER_STOP_OID = "1.3.6.1.4.1.42.1.1.1.2"
 SCANNER_RESTART_OID = "1.3.6.1.4.1.42.1.1.1.3"
 
 # Metrics (status counters): scanners.status -> 1.3.6.1.4.1.42.1.2
-RUNNING_COUNT_OID = "1.3.6.1.4.1.42.1.2.1"
-IDLE_COUNT_OID = "1.3.6.1.4.1.42.1.2.2"
-FINISHED_COUNT_OID = "1.3.6.1.4.1.42.1.2.3"
+RUNNING_COUNT_OID = "1.3.6.1.4.1.42.1.1.2.1"
+IDLE_COUNT_OID = "1.3.6.1.4.1.42.1.1.2.2"
+FINISHED_COUNT_OID = "1.3.6.1.4.1.42.1.1.2.3"
 
 # SNMP target config (overridable via env)
 _SNMP_HOST = os.environ.get("SNMP_AGENT_HOST", "127.0.0.1")
@@ -235,21 +235,22 @@ def ui_index():
 @app.post("/api/scan/start")
 async def api_scan_start():
     """Start scanners: perform SNMP SET to scannerStart OID = 1"""
-    pairs = [{"oid": SCANNER_START_OID, "type": "Integer", "value": 1}]
+    # these MIB objects are scalar OBJECT-TYPEs; use the instance suffix .0 for SET
+    pairs = [{"oid": f"{SCANNER_START_OID}", "type": "Integer", "value": 1}]
     res = await pysnmp_set(pairs)
     return JSONResponse(res)
 
 
 @app.post("/api/scan/stop")
 async def api_scan_stop():
-    pairs = [{"oid": SCANNER_STOP_OID, "type": "Integer", "value": 1}]
+    pairs = [{"oid": f"{SCANNER_STOP_OID}", "type": "Integer", "value": 1}]
     res = await pysnmp_set(pairs)
     return JSONResponse(res)
 
 
 @app.post("/api/scan/restart")
 async def api_scan_restart():
-    pairs = [{"oid": SCANNER_RESTART_OID, "type": "Integer", "value": 1}]
+    pairs = [{"oid": f"{SCANNER_RESTART_OID}", "type": "Integer", "value": 1}]
     res = await pysnmp_set(pairs)
     return JSONResponse(res)
 
@@ -257,7 +258,8 @@ async def api_scan_restart():
 @app.get("/api/metrics")
 async def api_metrics():
     """Consulta alguns OIDs de métricas (GET). Ajuste as OIDs conforme sua MIB."""
-    req_oids = [RUNNING_COUNT_OID, IDLE_COUNT_OID, FINISHED_COUNT_OID]
+    # these are scalar counters; request their instance (.0)
+    req_oids = [f"{RUNNING_COUNT_OID}", f"{IDLE_COUNT_OID}", f"{FINISHED_COUNT_OID}"]
     res = await pysnmp_get(req_oids)
     return JSONResponse(res)
 
