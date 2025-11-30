@@ -2,6 +2,7 @@ from pathlib import Path
 import sys
 import asyncio
 import random
+import os
 from typing import List, Any
 
 # garante que a pasta pai (service) esteja no sys.path para importar snmp.py
@@ -29,6 +30,17 @@ except Exception:
     OctetString = getattr(snmp_service, "OctetString", None)
     Null = getattr(snmp_service, "Null", None)
     VERSION = getattr(snmp_service, "VERSION", None)
+
+# try import pysnmp async API
+try:
+    from pysnmp.hlapi.asyncio import (
+        SnmpEngine, CommunityData, UdpTransportTarget, ContextData,
+        ObjectType, ObjectIdentity, get_cmd, set_cmd, Integer as PInteger, OctetString as POctetString, Null as PNull
+    )
+    _HAS_PYSNMP = True
+except Exception as ex:
+    print("pysnmp import error:", ex)
+    _HAS_PYSNMP = False
 
 app = FastAPI()
 
@@ -115,8 +127,100 @@ async def call_snmp_handler(context, vbs: List[Any]):
     return {"variable_bindings": out}
 
 
-# Exemplo de OID usado no seu SNMP local; ajuste conforme seu MIB
-ACTIONS_OID = "1.3.6.1.4.1.42.1.1"
+# OIDs extracted from your MIB (desc.mib)
+# Base: enterprises(1.3.6.1.4.1).42 -> discoveryMIB
+# autoDiscovery = discoveryMIB.1 -> 1.3.6.1.4.1.42.1
+# scanners = autoDiscovery.1 -> 1.3.6.1.4.1.42.1.1
+# actions = scanners.1 -> 1.3.6.1.4.1.42.1.1.1
+
+# Fully qualified OIDs for actions
+SCANNER_START_OID = "1.3.6.1.4.1.42.1.1.1.1"
+SCANNER_STOP_OID = "1.3.6.1.4.1.42.1.1.1.2"
+SCANNER_RESTART_OID = "1.3.6.1.4.1.42.1.1.1.3"
+
+# Metrics (status counters): scanners.status -> 1.3.6.1.4.1.42.1.2
+RUNNING_COUNT_OID = "1.3.6.1.4.1.42.1.2.1"
+IDLE_COUNT_OID = "1.3.6.1.4.1.42.1.2.2"
+FINISHED_COUNT_OID = "1.3.6.1.4.1.42.1.2.3"
+
+# SNMP target config (overridable via env)
+_SNMP_HOST = os.environ.get("SNMP_AGENT_HOST", "127.0.0.1")
+_SNMP_PORT = int(os.environ.get("SNMP_AGENT_PORT", "161"))
+_SNMP_COMMUNITY = os.environ.get("SNMP_COMMUNITY", "public")
+ 
+
+async def pysnmp_get(oids: List[str]):
+    if not _HAS_PYSNMP:
+        return {"error": "pysnmp not installed"}
+    try:
+        engine = SnmpEngine()
+        object_types = [ObjectType(ObjectIdentity(str(oid))) for oid in oids]
+        target = await UdpTransportTarget.create((_SNMP_HOST, _SNMP_PORT))
+        errorIndication, errorStatus, errorIndex, varBinds = await get_cmd(
+            engine,
+            CommunityData(_SNMP_COMMUNITY, mpModel=1),  # SNMPv2c
+            target,
+            ContextData(),
+            *object_types
+        )
+        if errorIndication:
+            return {"error": str(errorIndication)}
+        if errorStatus:
+            return {"error": str(errorStatus.prettyPrint())}
+        out = []
+        for name, val in varBinds:
+            out.append({"oid": str(name), "value": str(val), "type": val.__class__.__name__})
+        return {"variable_bindings": out}
+    except Exception as e:
+        return {"error": "exception in pysnmp_get", "detail": str(e)}
+
+
+async def pysnmp_set(pairs: List[dict]):
+    """
+    pairs: [{'oid': '1.2.3', 'type': 'Integer', 'value': 1}, ...]
+    """
+    if not _HAS_PYSNMP:
+        return {"error": "pysnmp not installed"}
+    try:
+        engine = SnmpEngine()
+        object_types = []
+        for p in pairs:
+            oid = str(p.get("oid"))
+            typ = p.get("type", "Integer")
+            val = p.get("value")
+            # map types to pysnmp types
+            if typ == "Integer":
+                v = PInteger(int(val))
+            elif typ == "OctetString":
+                v = POctetString(str(val))
+            elif typ == "Null":
+                v = PNull()
+            else:
+                # fallback: try Integer then OctetString
+                try:
+                    v = PInteger(int(val))
+                except Exception:
+                    v = POctetString(str(val))
+            object_types.append(ObjectType(ObjectIdentity(oid), v))
+
+        target = await UdpTransportTarget.create((_SNMP_HOST, _SNMP_PORT))
+        errorIndication, errorStatus, errorIndex, varBinds = await set_cmd(
+            engine,
+            CommunityData(_SNMP_COMMUNITY, mpModel=1),
+            target,
+            ContextData(),
+            *object_types
+        )
+        if errorIndication:
+            return {"error": str(errorIndication)}
+        if errorStatus:
+            return {"error": str(errorStatus.prettyPrint())}
+        out = []
+        for name, val in varBinds:
+            out.append({"oid": str(name), "value": str(val), "type": val.__class__.__name__})
+        return {"variable_bindings": out}
+    except Exception as e:
+        return {"error": "exception in pysnmp_set", "detail": str(e)}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -130,44 +234,31 @@ def ui_index():
 
 @app.post("/api/scan/start")
 async def api_scan_start():
-    """Clique 'start' -> traduz para um SET em ACTIONS_OID.1 = 1"""
-    if VariableBinding is None or Integer is None:
-        return JSONResponse({"error": "SNMP helper classes not available"}, status_code=500)
-    vb = VariableBinding(f"{ACTIONS_OID}.1", Integer(1))
-    res = await call_snmp_handler(getattr(snmp_service, "SnmpSetContext", lambda: None)(), [vb])
+    """Start scanners: perform SNMP SET to scannerStart OID = 1"""
+    pairs = [{"oid": SCANNER_START_OID, "type": "Integer", "value": 1}]
+    res = await pysnmp_set(pairs)
     return JSONResponse(res)
 
 
 @app.post("/api/scan/stop")
 async def api_scan_stop():
-    if VariableBinding is None or Integer is None:
-        return JSONResponse({"error": "SNMP helper classes not available"}, status_code=500)
-    vb = VariableBinding(f"{ACTIONS_OID}.2", Integer(1))
-    res = await call_snmp_handler(getattr(snmp_service, "SnmpSetContext", lambda: None)(), [vb])
+    pairs = [{"oid": SCANNER_STOP_OID, "type": "Integer", "value": 1}]
+    res = await pysnmp_set(pairs)
     return JSONResponse(res)
 
 
 @app.post("/api/scan/restart")
 async def api_scan_restart():
-    if VariableBinding is None or Integer is None:
-        return JSONResponse({"error": "SNMP helper classes not available"}, status_code=500)
-    vb = VariableBinding(f"{ACTIONS_OID}.3", Integer(1))
-    res = await call_snmp_handler(getattr(snmp_service, "SnmpSetContext", lambda: None)(), [vb])
+    pairs = [{"oid": SCANNER_RESTART_OID, "type": "Integer", "value": 1}]
+    res = await pysnmp_set(pairs)
     return JSONResponse(res)
 
 
 @app.get("/api/metrics")
 async def api_metrics():
     """Consulta alguns OIDs de métricas (GET). Ajuste as OIDs conforme sua MIB."""
-    req_oids = [
-        "1.3.6.1.4.1.42.1.2.1",
-        "1.3.6.1.4.1.42.1.2.2",
-        "1.3.6.1.4.1.42.1.2.3",
-    ]
-    if VariableBinding is None or Null is None:
-        return JSONResponse({"error": "SNMP helper classes not available"}, status_code=500)
-    vbs = [VariableBinding(oid, Null()) for oid in req_oids]
-    res = await call_snmp_handler(getattr(snmp_service, "SnmpGetContext", lambda: None)(), vbs)
+    req_oids = [RUNNING_COUNT_OID, IDLE_COUNT_OID, FINISHED_COUNT_OID]
+    res = await pysnmp_get(req_oids)
     return JSONResponse(res)
 
 
@@ -178,10 +269,7 @@ async def api_snmp_get(req: Request):
     oids = body.get("oids", [])
     if not isinstance(oids, list) or len(oids) == 0:
         return JSONResponse({"error": "expecting JSON with 'oids': [..]"}, status_code=400)
-    if VariableBinding is None or Null is None:
-        return JSONResponse({"error": "SNMP helper classes not available"}, status_code=500)
-    vbs = [VariableBinding(str(o), Null()) for o in oids]
-    res = await call_snmp_handler(getattr(snmp_service, "SnmpGetContext", lambda: None)(), vbs)
+    res = await pysnmp_get([str(o) for o in oids])
     return JSONResponse(res)
 
 
@@ -196,23 +284,16 @@ async def api_snmp_set(req: Request):
     pairs = body.get("pairs", [])
     if not isinstance(pairs, list) or len(pairs) == 0:
         return JSONResponse({"error": "expecting JSON with 'pairs': [..]"}, status_code=400)
-    vbs = []
+    # Validate pairs minimally and pass to pysnmp_set
+    valid = []
     for p in pairs:
         oid = str(p.get("oid"))
         typ = p.get("type", "Integer")
+        if "value" not in p:
+            return JSONResponse({"error": "each pair must include 'value'"}, status_code=400)
         val = p.get("value")
-        if typ == "Integer" and Integer is not None:
-            vbs.append(VariableBinding(oid, Integer(val)))
-        elif typ == "OctetString" and OctetString is not None:
-            vbs.append(VariableBinding(oid, OctetString(val)))
-        else:
-            # fallback: try to construct with provided class in snmp_service
-            cls = getattr(snmp_service, typ, None)
-            if cls is not None:
-                vbs.append(VariableBinding(oid, cls(val)))
-            else:
-                return JSONResponse({"error": f"unsupported type {typ} or missing class"}, status_code=400)
-    res = await call_snmp_handler(getattr(snmp_service, "SnmpSetContext", lambda: None)(), vbs)
+        valid.append({"oid": oid, "type": typ, "value": val})
+    res = await pysnmp_set(valid)
     return JSONResponse(res)
 
 

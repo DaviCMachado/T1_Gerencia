@@ -7,3 +7,5 @@ scapy
 pathlib
 requests
 snmp-agent
+pysnmplib
+pyasyncore
