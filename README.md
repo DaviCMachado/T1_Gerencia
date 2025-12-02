@@ -7,3 +7,4 @@ Ver [interface](./interface/README.md) para a aplicação com GUI que interage c
 
 - [Davi de Castro Machado](https://github.com/DaviCMachado)
 - [Rodrigo Appelt](https://github.com/Agentew04)
+- [Mariana Lopes Pillon](https://github.com/m-pillon)
